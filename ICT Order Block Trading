@@ -1,0 +1,83 @@
+Order Blocks are the <a href="https://innercircletrading.website/"> ICT Trading Concepts </a>
+es = input.timeframe(defval="240", options=["60","120","240"], group="Timeframe Selection")
+plotOrderBlocks = input.bool(defval=true, title='Plot Order Blocks', group='Order Blocks')
+bullishColor = input.color(defval=color.new(color.green, 90), title='Bullish Color', inline='Set Custom Color', group='Order Blocks')
+bearishColor = input.color(defval=color.new(color.red, 90), title='Bearish Color', inline='Set Custom Color', group='Order Blocks')
+boxBorderStyle = input.string(defval=line.style_solid, title='Box Border Style', options=[line.style_dashed, line.style_dotted, line.style_solid], group='Order Blocks', tooltip='To disable border, set Border Width below to 0')
+boxTransparency = input.int(defval=80, title='Box Transparency', minval=0, maxval=100, group='Order Blocks')
+maxBoxDisplay = input.int(defval=10, title='Maximum Box Displayed', minval=1, maxval=100, group='Order Blocks', tooltip='Minimum = 1, Maximum = 100')
+customColorMitigated = input.bool(defval=false, title='Custom Color Mitigated', group='Order Blocks')
+mitigatedColor = input.color(defval=color.new(color.gray, 90), title='Mitigated Color', group='Order Blocks', inline='Set Custom Color Mitigated', tooltip='Set Transparency to 0 to make mitigated OB disappear')
+
+plotLabel = input.bool(defval=true, title='Plot Label', inline='Label', group='Label Options')
+labelColor = input.color(defval=color.gray, title='Color', inline='Label', group='Label Options')
+labelSize = input.string(defval=size.tiny, title="Size", options=[size.huge, size.large, size.small, size.tiny, size.auto, size.normal], inline='Label', group='Label Options')
+
+// Box Types
+var int _orderBlock  = 1
+var int _fairValueGap = 2
+var int _rjb = 3
+var int _bos = 4
+
+// Box Labels
+var string _obLabel  = "OB"
+var string _fvgLabel = "FVG"
+var string _rjbLabel = "RJB"
+var string _bosLabel = "BoS"
+var string _plus     = "+"
+var string _minus    = "-"
+var string _empty    = ""
+
+// Box Arrays
+var box[] _bearBoxesOB  = array.new_box()
+var box[] _bullBoxesOB  = array.new_box()
+var box[] _bearBoxesFVG = array.new_box()
+var box[] _bullBoxesFVG = array.new_box()
+var box[] _bearBoxesRJB = array.new_box()
+var box[] _bullBoxesRJB = array.new_box()
+var box[] _bearBoxesBOS = array.new_box()
+var box[] _bullBoxesBOS = array.new_box()
+
+// Functions
+isUp(index) =>
+    close[index] > open[index]
+
+isDown(index) =>
+    close[index] < open[index]
+
+isObUp(index) =>
+    isDown(index + 1) and isUp(index) and close[index] > high[index + 1]
+
+isObDown(index) =>
+    isUp(index + 1) and isDown(index) and close[index] < low[index + 1]
+
+isFvgUp(index) =>
+    (low[index] > high[index + 2])
+
+isFvgDown(index) =>
+    (high[index] < low[index + 2])
+
+res = input.timeframe(defval="240", options=["60","120","240"], group="Timeframe Selection")
+_htf_High1 = request.security(syminfo.tickerid, res, high[1])
+_htf_High2 = request.security(syminfo.tickerid, res, high[2])
+_htf_Low1 = request.security(syminfo.tickerid, res, low[1])
+_htf_Low2 = request.security(syminfo.tickerid, res, low[1])
+_htf_BarIndex2 = request.security(syminfo.tickerid, res, time[2])
+
+//////////////////// Order Block //////////////////
+// Bullish OB Box Plotting
+if isObUp(1) and plotOrderBlocks
+    _bullboxOB = box.new(left=_htf_BarIndex2, top=_htf_High2, right=time, bottom=math.min(_htf_Low2, _htf_Low1), border_color=color.new(bullishColor, boxTransparency), border_style=boxBorderStyle, border_width=1, bgcolor=bullishColor, 
+     text=plotLabel ? _obLabel  + _plus : _empty, text_halign=text.align_right, text_valign=text.align_bottom, text_size=labelSize, text_color=labelColor)
+    if array.size(_bullBoxesOB) > maxBoxDisplay
+        box.delete(array.shift(_bullBoxesOB))
+    array.push(_bullBoxesOB, _bullboxOB)
+
+if array.size(_bullBoxesOB) > 0
+    for i = array.size(_bullBoxesOB) - 1 to 0 by 1
+        _box = array.get(_bullBoxesOB, i)
+        _boxLow = box.get_bottom(_box)
+        _boxHigh = box.get_top(_box)
+        _boxRight = box.get_right(_box)
+        if na or (time == _boxRight and not((high > _boxLow and low < _boxLow) or (high > _boxHigh and low < _boxHigh)))
+            box.set_right(_box, time + 1)
